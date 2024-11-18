@@ -1,4 +1,4 @@
-name: Build and Deploy to Azure
+name: Build and Deploy to Azure with Persistent Storage
 
 on:
   push:
@@ -14,13 +14,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Step 2: Login to Azure Container Registry (ACR)
-      - name: Login to Azure Container Registry
-        uses: azure/docker-login@v1
+      # Step 2: Login to Azure
+      - name: Login to Azure
+        uses: azure/login@v1
         with:
-          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # Step 3: Build and Push Docker Image
       - name: Build and Push Docker Image to ACR
@@ -29,16 +27,20 @@ jobs:
           docker build -t $IMAGE_TAG .
           docker push $IMAGE_TAG
 
-      # Step 4: Deploy to Azure Container Instances (ACI)
+      # Step 4: Deploy to Azure Container Instances with Persistent Storage
       - name: Deploy to Azure Container Instances
-        uses: azure/aci-deploy@v1
-        with:
-          resource-group: ${{ secrets.RESOURCE_GROUP }}
-          name: my-container-app
-          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-container:${{ github.run_number }}
-          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          registry-username: ${{ secrets.REGISTRY_USERNAME }}
-          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-          dns-name-label: ${{ secrets.DNS_LABEL }}-${{ github.run_number }}
-          location: westus
-          ports: '80'
+        run: |
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name my-container-app \
+            --image ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-container:${{ github.run_number }} \
+            --registry-login-server ${{ secrets.REGISTRY_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.REGISTRY_USERNAME }} \
+            --registry-password ${{ secrets.REGISTRY_PASSWORD }} \
+            --dns-name-label ${{ secrets.DNS_LABEL }}-${{ github.run_number }} \
+            --location swedencentral \
+            --ports 80 \
+            --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --azure-file-volume-account-key ${{ secrets.STORAGE_ACCOUNT_KEY }} \
+            --azure-file-volume-share-name ${{ secrets.FILE_SHARE_NAME }} \
+            --azure-file-volume-mount-path /mnt/data
