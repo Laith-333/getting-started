@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
+      # Step 1: Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Login to Azure
+      # Step 2: Login to Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Login to ACR
+      # Step 3: Login to Azure Container Registry (ACR)
       - name: Login to Azure Container Registry
         uses: azure/docker-login@v1
         with:
@@ -28,23 +28,23 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      # Build and Push Docker Image
-      - name: Build and Push Docker Image
+      # Step 4: Build and Push Docker Image
+      - name: Build and Push Docker Image to ACR
         run: |
-          IMAGE_TAG=${{ secrets.REGISTRY_LOGIN_SERVER }}/myapp:${{ github.run_number }}
+          IMAGE_TAG=${{ secrets.REGISTRY_LOGIN_SERVER }}/my-container:${{ github.run_number }}
           docker build . -t $IMAGE_TAG
           docker push $IMAGE_TAG
 
-      # Deploy to Azure Container Instances
+      # Step 5: Deploy to Azure Container Instances (ACI)
       - name: Deploy to Azure Container Instances
         uses: azure/aci-deploy@v1
         with:
           resource-group: ${{ secrets.RESOURCE_GROUP }}
-          dns-name-label: mycontainer-${{ github.run_number }}
-          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/myapp:${{ github.run_number }}
+          dns-name-label: ${{ secrets.DNS_LABEL }}-${{ github.run_number }}
+          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-container:${{ github.run_number }}
           registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
           registry-username: ${{ secrets.REGISTRY_USERNAME }}
           registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-          name: mycontainer
-          location: swedencentral
-          ports: '3000'
+          name: my-container-app
+          location: westus
+          ports: '80'
