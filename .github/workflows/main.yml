@@ -40,5 +40,5 @@ jobs:
           registry-username: ${{ secrets.REGISTRY_USERNAME }}
           registry-password: ${{ secrets.REGISTRY_PASSWORD }}
           dns-name-label: ${{ secrets.DNS_LABEL }}-${{ github.run_number }}
-          location: westus
+          location: swedencentral
           ports: '80'
