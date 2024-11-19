@@ -35,8 +35,8 @@ jobs:
           docker build -t $IMAGE_TAG .
           docker push $IMAGE_TAG
 
-      # Step 5: Deploy to Azure Container Instances (ACI) with Persistent Storage
-      - name: Deploy to Azure Container Instances
+      # Step 5: Deploy to Azure Container Instances with Persistent Storage
+      - name: Deploy to Azure Container Instances with Persistent Storage
         run: |
           az container create \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
@@ -50,5 +50,12 @@ jobs:
             --ports 80 \
             --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
             --azure-file-volume-account-key ${{ secrets.STORAGE_ACCOUNT_KEY }} \
-            --azure-file-volume-share-name <file_share_name> \
+            --azure-file-volume-share-name ${{ secrets.FILE_SHARE_NAME }} \
             --azure-file-volume-mount-path /mnt/data
+
+      # Step 6: Debugging Variables (Optional)
+      - name: Debug Variables
+        run: |
+          echo "Resource Group: ${{ secrets.RESOURCE_GROUP }}"
+          echo "Storage Account Name: ${{ secrets.STORAGE_ACCOUNT_NAME }}"
+          echo "File Share Name: ${{ secrets.FILE_SHARE_NAME }}"
