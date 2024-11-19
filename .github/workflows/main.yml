@@ -1,4 +1,4 @@
-name: Build and Deploy to Azure
+name: Build and Deploy to Azure with Persistent Storage
 
 on:
   push:
@@ -35,16 +35,20 @@ jobs:
           docker build -t $IMAGE_TAG .
           docker push $IMAGE_TAG
 
-      # Step 5: Deploy to Azure Container Instances (ACI)
+      # Step 5: Deploy to Azure Container Instances (ACI) with Persistent Storage
       - name: Deploy to Azure Container Instances
-        uses: azure/aci-deploy@v1
-        with:
-          resource-group: ${{ secrets.RESOURCE_GROUP }}
-          name: my-container-app
-          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-container:${{ github.run_number }}
-          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          registry-username: ${{ secrets.REGISTRY_USERNAME }}
-          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-          dns-name-label: ${{ secrets.DNS_LABEL }}-${{ github.run_number }}
-          location: swedencentral
-          ports: '80'
+        run: |
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name my-container-app \
+            --image ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-container:${{ github.run_number }} \
+            --registry-login-server ${{ secrets.REGISTRY_LOGIN_SERVER }} \
+            --registry-username ${{ secrets.REGISTRY_USERNAME }} \
+            --registry-password ${{ secrets.REGISTRY_PASSWORD }} \
+            --dns-name-label ${{ secrets.DNS_LABEL }}-${{ github.run_number }} \
+            --location swedencentral \
+            --ports 80 \
+            --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --azure-file-volume-account-key ${{ secrets.STORAGE_ACCOUNT_KEY }} \
+            --azure-file-volume-share-name <file_share_name> \
+            --azure-file-volume-mount-path /mnt/data
