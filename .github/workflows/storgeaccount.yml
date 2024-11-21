@@ -1,4 +1,4 @@
-name: Azure Storage File Upload Workflow
+name: Azure File Share Upload Workflow
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  upload-to-storage:
+  upload-to-fileshare:
     runs-on: ubuntu-latest
     steps:
       # Step 1: Check out the repository
@@ -19,31 +19,21 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Step 3: Upload a file to the Azure Storage container
-      - name: Upload File to Azure Container
+      # Step 3: Upload a file to the Azure File Share
+      - name: Upload File to Azure File Share
         run: |
           # Retrieve the storage account key
           STORAGE_KEY=$(az storage account keys list \
-            --account-name <your-storage-account-name> \
+            --account-name mystorageaccount1283 \
             --query "[0].value" -o tsv)
 
-          # Upload the file to the specified blob container
-          az storage blob upload \
-            --container-name <your-container-name> \
-            --file ./<path-to-local-file> \
-            --name <blob-name> \
-            --account-name <your-storage-account-name> \
-            --account-key $STORAGE_KEY
-        env:
-          AZURE_STORAGE_ACCOUNT: <your-storage-account-name>
+          # Mount the file share locally (Linux)
+          sudo mkdir -p /mnt/azurefileshare
+          sudo mount -t cifs //mystorageaccount1283.file.core.windows.net/myfileshare /mnt/azurefileshare \
+            -o vers=3.0,username=mystorageaccount1283,password=$STORAGE_KEY,dir_mode=0777,file_mode=0777,sec=ntlmssp
 
-      # Step 4: Confirm upload (optional)
-      - name: List blobs in container
-        run: |
-          az storage blob list \
-            --container-name <your-container-name> \
-            --account-name <your-storage-account-name> \
-            --account-key $(az storage account keys list \
-              --account-name <your-storage-account-name> \
-              --query "[0].value" -o tsv) \
-            --output table
+          # Copy the file to the Azure File Share
+          sudo cp ./path-to-your-local-file.txt /mnt/azurefileshare/
+
+          # Unmount the file share
+          sudo umount /mnt/azurefileshare
