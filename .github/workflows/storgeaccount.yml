@@ -1,0 +1,50 @@
+name: Connect Storage Account to Container
+
+on:
+  workflow_dispatch: # Trigger manually when needed
+
+jobs:
+  connect-storage:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Login to Azure
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Step 3: Deploy Persistent Storage
+      - name: Deploy Persistent Storage
+        run: |
+          az storage account keys list \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --query "[0].value" \
+            -o tsv > storage-key.txt
+
+          STORAGE_KEY=$(cat storage-key.txt)
+
+          # Attach Azure File Share to the existing container
+          az container create \
+            --name ${{ secrets.CONTAINER_NAME }} \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --image ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ secrets.CONTAINER_IMAGE }} \
+            --ports 3000 \
+            --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --azure-file-volume-account-key $STORAGE_KEY \
+            --azure-file-volume-share-name ${{ secrets.FILE_SHARE_NAME }} \
+            --azure-file-volume-mount-path /mnt/azurefiles \
+            --environment-variables STORAGE_PATH=/mnt/azurefiles
+
+      # Step 4: Verify Deployment
+      - name: Verify Storage Connection
+        run: |
+          az container show \
+            --name ${{ secrets.CONTAINER_NAME }} \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --query "instanceView.state"
