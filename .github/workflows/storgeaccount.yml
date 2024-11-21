@@ -27,13 +27,16 @@ jobs:
             --account-name mystorageaccount1283 \
             --query "[0].value" -o tsv)
 
-          # Mount the file share locally (Linux)
+          # Install CIFS utilities (if not already installed)
+          sudo apt-get update && sudo apt-get install -y cifs-utils
+
+          # Mount the file share locally
           sudo mkdir -p /mnt/azurefileshare
           sudo mount -t cifs //mystorageaccount1283.file.core.windows.net/myfileshare /mnt/azurefileshare \
             -o vers=3.0,username=mystorageaccount1283,password=$STORAGE_KEY,dir_mode=0777,file_mode=0777,sec=ntlmssp
 
           # Copy the file to the Azure File Share
-          sudo cp ./path-to-your-local-file.txt /mnt/azurefileshare/
+          sudo cp ./myfile.txt /mnt/azurefileshare/
 
           # Unmount the file share
           sudo umount /mnt/azurefileshare
