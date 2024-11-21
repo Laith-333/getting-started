@@ -1,4 +1,4 @@
-name: Build, Deploy, and Connect Azure Storage
+name: Azure Storage File Upload Workflow
 
 on:
   push:
@@ -6,73 +6,44 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  upload-to-storage:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up job
-        run: echo "Initializing job..."
+      # Step 1: Check out the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Pre Login to Azure
-        uses: azure/login@v1
-        with:
-          enable-AzPSSession: true
-
-      - name: Login to Azure
+      # Step 2: Log in to Azure using a Service Principal
+      - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Attach Azure File Share
+      # Step 3: Upload a file to the Azure Storage container
+      - name: Upload File to Azure Container
         run: |
           # Retrieve the storage account key
-          STORAGE_KEY=$(az storage account keys list --account-name <your-storage-account-name> --query "[0].value" -o tsv)
-
-          # Create the Azure file share if it doesn't exist
-          az storage share create \
-            --name <your-file-share-name> \
+          STORAGE_KEY=$(az storage account keys list \
             --account-name <your-storage-account-name> \
-            --account-key $STORAGE_KEY
+            --query "[0].value" -o tsv)
 
-          # Create a container in the storage account
-          az storage container create \
-            --name <your-container-name> \
+          # Upload the file to the specified blob container
+          az storage blob upload \
+            --container-name <your-container-name> \
+            --file ./<path-to-local-file> \
+            --name <blob-name> \
             --account-name <your-storage-account-name> \
             --account-key $STORAGE_KEY
         env:
           AZURE_STORAGE_ACCOUNT: <your-storage-account-name>
-          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
 
-      - name: Post Login to Azure
-        run: echo "Job complete, cleaning up..."
-
-  deploy-storage:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up job
-        run: echo "Deploying storage..."
-
-      - name: Pre Login to Azure
-        uses: azure/login@v1
-        with:
-          enable-AzPSSession: true
-
-      - name: Login to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Attach Azure File Share
+      # Step 4: Confirm upload (optional)
+      - name: List blobs in container
         run: |
-          # Attach Azure file share
-          STORAGE_KEY=$(az storage account keys list --account-name <your-storage-account-name> --query "[0].value" -o tsv)
-
-          az storage share create \
-            --name <your-file-share-name> \
+          az storage blob list \
+            --container-name <your-container-name> \
             --account-name <your-storage-account-name> \
-            --account-key $STORAGE_KEY
-        env:
-          AZURE_STORAGE_ACCOUNT: <your-storage-account-name>
-          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
-
-      - name: Post Login to Azure
-        run: echo "Job completed, storage attached."
+            --account-key $(az storage account keys list \
+              --account-name <your-storage-account-name> \
+              --query "[0].value" -o tsv) \
+            --output table
