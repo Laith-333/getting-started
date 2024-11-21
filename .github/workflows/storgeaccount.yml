@@ -1,50 +1,75 @@
-name: Connect Storage Account to Container
+name: Build, Deploy, and Connect Azure Storage
 
 on:
-  workflow_dispatch: # Trigger manually when needed
+  push:
+    branches:
+      - main
 
 jobs:
-  connect-storage:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Step 2: Login to Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Step 3: Deploy Persistent Storage
-      - name: Deploy Persistent Storage
+      - name: Login to Azure Container Registry (ACR)
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and Push Docker Image
         run: |
-          az storage account keys list \
+          IMAGE_TAG=${{ secrets.REGISTRY_LOGIN_SERVER }}/my-app:${{ github.run_number }}
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
+
+      - name: Deploy Container to Azure
+        uses: azure/aci-deploy@v1
+        with:
+          resource-group: ${{ secrets.RESOURCE_GROUP }}
+          name: my-container-app
+          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-app:${{ github.run_number }}
+          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+          dns-name-label: my-container-${{ github.run_number }}
+          location: swedencentral
+          ports: '3000'
+          environment-variables: |
+            STORAGE_PATH=/mnt/azurefiles
+
+  deploy-storage:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Attach Azure File Share
+        run: |
+          STORAGE_KEY=$(az storage account keys list \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
             --account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
-            --query "[0].value" \
-            -o tsv > storage-key.txt
+            --query "[0].value" -o tsv)
 
-          STORAGE_KEY=$(cat storage-key.txt)
-
-          # Attach Azure File Share to the existing container
           az container create \
-            --name ${{ secrets.CONTAINER_NAME }} \
+            --name my-container-app \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --image ${{ secrets.REGISTRY_LOGIN_SERVER }}/${{ secrets.CONTAINER_IMAGE }} \
+            --image ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-app:${{ github.run_number }} \
             --ports 3000 \
             --azure-file-volume-account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
             --azure-file-volume-account-key $STORAGE_KEY \
             --azure-file-volume-share-name ${{ secrets.FILE_SHARE_NAME }} \
             --azure-file-volume-mount-path /mnt/azurefiles \
             --environment-variables STORAGE_PATH=/mnt/azurefiles
-
-      # Step 4: Verify Deployment
-      - name: Verify Storage Connection
-        run: |
-          az container show \
-            --name ${{ secrets.CONTAINER_NAME }} \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --query "instanceView.state"
