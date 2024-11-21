@@ -19,16 +19,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Step 3: Retrieve data from the container app
-      - name: Retrieve Data from Container App
-        run: |
-          # API URL of the container app
-          CONTAINER_API_URL="http://container-27.swedencentral.azurecontainer.io:3000/api/items"
-          
-          # Fetch data using curl and save to a temporary file
-          curl -s $CONTAINER_API_URL > data.json
-
-      # Step 4: Upload data to Azure File Share
+      # Step 3: Upload data to Azure File Share
       - name: Upload Data to Azure File Share
         run: |
           # Retrieve the storage account key
@@ -44,8 +35,9 @@ jobs:
           sudo mount -t cifs //mystorageaccount1283.file.core.windows.net/myfileshare /mnt/azurefileshare \
             -o vers=3.0,username=mystorageaccount1283,password=$STORAGE_KEY,dir_mode=0777,file_mode=0777,sec=ntlmssp
 
-          # Save the retrieved data to the file share
-          sudo cp ./data.json /mnt/azurefileshare/
+          # Copy a file to the Azure File Share
+          echo "Sample data for Azure File Share" > sample-data.txt
+          sudo cp ./sample-data.txt /mnt/azurefileshare/
 
           # Unmount the file share
           sudo umount /mnt/azurefileshare
